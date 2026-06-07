@@ -2,3 +2,13 @@
 __pycache__/
 *.pyc
 data/publications.sqlite
+.DS_Store
+**/.DS_Store
+*.bak
+*.bak-*
+.coverage
+*.textClipping
+.vscode/
+logs/
+backups/
+*.sqlite.bak

@@ -49,7 +49,9 @@ from pydantic import BaseModel, Field
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "publications.sqlite"
+# DB path can be overridden via PUBLICATION_REPO_DB so tests can point at an
+# isolated temp file. Default keeps the original on-disk location.
+DB_PATH = Path(os.environ.get("PUBLICATION_REPO_DB", str(ROOT / "data" / "publications.sqlite")))
 
 
 def _now() -> str:
@@ -129,6 +131,57 @@ def require_polity_token(
     if token != expected:
         raise HTTPException(status_code=403, detail="Invalid publication key")
     return x_polity.lower()
+
+
+# ─── Reader auth (added 2026-05-23, audit Q6) ────────────────────────────────
+# Read endpoints (manifest, papers, recent, search) are public by default for
+# backwards compat. To enable private-reads, set
+# `PUBLICATION_REPO_REQUIRE_AUTH_ON_READS=1` in the daemon env. With it on,
+# every read needs Authorization: Bearer <token> where <token> is any value
+# from the `PUBLICATION_KEY_*` polity allowlist OR a value from the read-only
+# allowlist `PUBLICATION_READER_KEY` (single value, comma-separated multi
+# allowed).
+#
+# The public surface that survives auth-on-reads is `/health` plus the new
+# `/publications/v1/manifest-summary` (counts only, no titles/abstracts/bodies).
+# These let Overseer + the NEDs render liveness cards without holding a key.
+
+
+def _reader_tokens() -> set[str]:
+    """Set of bearer tokens valid for read endpoints.
+
+    Includes every polity write key (a polity can read what it submits) plus
+    any tokens in PUBLICATION_READER_KEY (comma-separated). Empty set means
+    no reader-only keys are configured.
+    """
+    tokens: set[str] = set(_polity_tokens().values())
+    raw = os.environ.get("PUBLICATION_READER_KEY", "")
+    for t in raw.split(","):
+        t = t.strip()
+        if t:
+            tokens.add(t)
+    return tokens
+
+
+def _read_auth_required() -> bool:
+    return os.environ.get("PUBLICATION_REPO_REQUIRE_AUTH_ON_READS") in {"1", "true", "TRUE", "yes"}
+
+
+def require_reader_token(
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+) -> Optional[str]:
+    """If auth-on-reads is enabled, require a valid Bearer token; else no-op.
+
+    Returns the token (or None when auth is disabled) so handlers can audit.
+    """
+    if not _read_auth_required():
+        return None
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Bearer token required (reads are private)")
+    token = authorization.split(" ", 1)[1].strip()
+    if token not in _reader_tokens():
+        raise HTTPException(status_code=403, detail="Invalid reader token")
+    return token
 
 
 # ─── Models ──────────────────────────────────────────────────────────────────
@@ -258,8 +311,36 @@ def submit(
     return {"action": action, "paper": _row_to_paper(row)}
 
 
+@app.get("/publications/v1/manifest-summary")
+def manifest_summary(conn: sqlite3.Connection = Depends(db)):
+    """Public counts-only manifest. Survives auth-on-reads so consumers
+    can render liveness (publication-repo card, audit-tick) without holding
+    a reader key. Added 2026-05-23 (audit Q6)."""
+    rows = conn.execute(
+        "SELECT origin_polity_id, domain FROM papers"
+    ).fetchall()
+    by_polity: dict[str, int] = {}
+    by_domain: dict[str, int] = {}
+    for r in rows:
+        by_polity[r["origin_polity_id"]] = by_polity.get(r["origin_polity_id"], 0) + 1
+        if r["domain"]:
+            by_domain[r["domain"]] = by_domain.get(r["domain"], 0) + 1
+    return {
+        "repo": "ai-society-publication-repo",
+        "version": "0.1.0",
+        "as_of": _now(),
+        "papers_total": len(rows),
+        "by_polity": by_polity,
+        "by_domain": by_domain,
+        "auth_on_reads": _read_auth_required(),
+    }
+
+
 @app.get("/publications/v1/manifest")
-def manifest(conn: sqlite3.Connection = Depends(db)):
+def manifest(
+    conn: sqlite3.Connection = Depends(db),
+    _reader: Optional[str] = Depends(require_reader_token),
+):
     """Machine-readable index of every paper. Use this to bootstrap an
     external consumer (search engine, MCP server, web crawler)."""
     rows = conn.execute(
@@ -285,7 +366,11 @@ def manifest(conn: sqlite3.Connection = Depends(db)):
 
 
 @app.get("/publications/v1/papers/{paper_id:path}")
-def get_paper(paper_id: str, conn: sqlite3.Connection = Depends(db)):
+def get_paper(
+    paper_id: str,
+    conn: sqlite3.Connection = Depends(db),
+    _reader: Optional[str] = Depends(require_reader_token),
+):
     """Fetch a single paper (markdown + metadata).
 
     paper_id can be either the full canonical form
@@ -308,6 +393,7 @@ def recent(
     limit: int = Query(default=50, ge=1, le=500),
     polity: Optional[str] = None,
     conn: sqlite3.Connection = Depends(db),
+    _reader: Optional[str] = Depends(require_reader_token),
 ):
     if polity:
         rows = conn.execute(
@@ -324,7 +410,11 @@ def recent(
 
 
 @app.get("/publications/v1/search")
-def search(q: str, conn: sqlite3.Connection = Depends(db)):
+def search(
+    q: str,
+    conn: sqlite3.Connection = Depends(db),
+    _reader: Optional[str] = Depends(require_reader_token),
+):
     """Naive LIKE search across title + abstract + body. Replace with FTS
     when corpus grows."""
     if not q.strip():
