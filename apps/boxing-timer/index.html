@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Boxing Timer</title>
+<style>
+  :root{
+    --bg:#0d0d12;
+    --panel:#16161f;
+    --panel-2:#1f1f2b;
+    --text:#f4f4f8;
+    --muted:#8a8a9a;
+    --accent:#ff3b30;
+    --round:#22c55e;
+    --rest:#3b82f6;
+    --prep:#f59e0b;
+    --done:#a855f7;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;
+    flex-direction:column;
+    min-height:100%;
+    min-height:100dvh;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow:hidden;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+
+  /* ---------- Setup screen ---------- */
+  #setup{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    padding:24px 20px calc(20px + env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  h1{
+    font-size:26px;
+    font-weight:800;
+    letter-spacing:.5px;
+    margin:8px 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  h1 .glove{font-size:28px;}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px;}
+
+  .field{
+    background:var(--panel);
+    border-radius:16px;
+    padding:16px 18px;
+    margin-bottom:14px;
+  }
+  .field .label{
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--muted);
+    margin-bottom:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .field .value{
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    color:var(--text);
+    font-size:17px;
+  }
+  .stepper{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .stepper button{
+    flex:0 0 auto;
+    width:54px;height:54px;
+    border:none;
+    border-radius:14px;
+    background:var(--panel-2);
+    color:var(--text);
+    font-size:28px;
+    font-weight:600;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:transform .05s, background .15s;
+  }
+  .stepper button:active{transform:scale(.9);background:#2c2c3c;}
+  .stepper .display{
+    flex:1;
+    text-align:center;
+    font-size:34px;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+  }
+  .stepper .display small{
+    display:block;
+    font-size:12px;
+    font-weight:500;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-top:2px;
+  }
+
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .switch{position:relative;width:52px;height:30px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{
+    position:absolute;inset:0;
+    background:var(--panel-2);
+    border-radius:30px;
+    transition:.2s;
+    cursor:pointer;
+  }
+  .slider:before{
+    content:"";position:absolute;
+    height:24px;width:24px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:.2s;
+  }
+  .switch input:checked + .slider{background:var(--round);}
+  .switch input:checked + .slider:before{transform:translateX(22px);}
+
+  .summary{
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+    margin:6px 0 18px;
+    line-height:1.5;
+  }
+  .summary b{color:var(--text);}
+
+  .start-btn{
+    margin-top:auto;
+    width:100%;
+    border:none;
+    border-radius:18px;
+    background:var(--accent);
+    color:#fff;
+    font-size:21px;
+    font-weight:800;
+    letter-spacing:1px;
+    padding:20px;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(255,59,48,.3);
+    transition:transform .05s;
+  }
+  .start-btn:active{transform:scale(.98);}
+
+  /* ---------- Timer screen ---------- */
+  #timer{
+    display:none;
+    flex:1;
+    flex-direction:column;
+    text-align:center;
+    transition:background .4s;
+  }
+  #timer.active{display:flex;}
+  .phase{
+    font-size:32px;
+    font-weight:800;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    margin-top:24px;
+  }
+  .round-count{
+    font-size:16px;
+    letter-spacing:2px;
+    color:rgba(255,255,255,.85);
+    margin-top:6px;
+    text-transform:uppercase;
+  }
+  .clock{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:min(38vw,210px);
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    line-height:1;
+    letter-spacing:-2px;
+  }
+  .controls{
+    display:flex;
+    gap:14px;
+    padding:0 20px calc(28px + env(safe-area-inset-bottom));
+  }
+  .controls button{
+    flex:1;
+    border:none;
+    border-radius:16px;
+    padding:20px;
+    font-size:18px;
+    font-weight:800;
+    letter-spacing:1px;
+    cursor:pointer;
+    background:rgba(255,255,255,.16);
+    color:#fff;
+    backdrop-filter:blur(4px);
+    transition:transform .05s;
+  }
+  .controls button:active{transform:scale(.96);}
+  .controls button.primary{background:rgba(255,255,255,.92);color:#111;}
+
+  .next-up{
+    color:rgba(255,255,255,.7);
+    font-size:14px;
+    letter-spacing:1px;
+    min-height:18px;
+    margin-bottom:18px;
+    text-transform:uppercase;
+  }
+  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== SETUP ===================== -->
+<section id="setup">
+  <h1><span class="glove">🥊</span> Boxing Timer</h1>
+  <p class="sub">Set your rounds, rest, and go.</p>
+
+  <!-- Round length -->
+  <div class="field">
+    <div class="label">Round length</div>
+    <div class="stepper">
+      <button data-act="dec" data-key="roundSec" data-step="15" aria-label="decrease">−</button>
+      <div class="display"><span id="roundSecDisp">3:00</span><small>min : sec</small></div>
+      <button data-act="inc" data-key="roundSec" data-step="15" aria-label="increase">+</button>
+    </div>
+  </div>
+
+  <!-- Rest length -->
+  <div class="field">
+    <div class="label">Rest between rounds</div>
+    <div class="stepper">
+      <button data-act="dec" data-key="restSec" data-step="15" aria-label="decrease">−</button>
+      <div class="display"><span id="restSecDisp">1:00</span><small>min : sec</small></div>
+      <button data-act="inc" data-key="restSec" data-step="15" aria-label="increase">+</button>
+    </div>
+  </div>
+
+  <!-- Number of rounds -->
+  <div class="field">
+    <div class="label">Number of rounds</div>
+    <div class="stepper">
+      <button data-act="dec" data-key="rounds" data-step="1" aria-label="decrease">−</button>
+      <div class="display"><span id="roundsDisp">12</span><small>rounds</small></div>
+      <button data-act="inc" data-key="rounds" data-step="1" aria-label="increase">+</button>
+    </div>
+  </div>
+
+  <!-- Prep / get ready -->
+  <div class="field">
+    <div class="label">Prep countdown</div>
+    <div class="stepper">
+      <button data-act="dec" data-key="prepSec" data-step="5" aria-label="decrease">−</button>
+      <div class="display"><span id="prepSecDisp">0:10</span><small>get ready</small></div>
+      <button data-act="inc" data-key="prepSec" data-step="5" aria-label="increase">+</button>
+    </div>
+  </div>
+
+  <!-- Sound toggle -->
+  <div class="field toggle-row">
+    <div>
+      <div class="value">Sound &amp; warning beeps</div>
+      <div style="color:var(--muted);font-size:12px;margin-top:4px;">10s warning + end-of-round bell</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="soundToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <p class="summary" id="summary"></p>
+
+  <button class="start-btn" id="startBtn">START WORKOUT</button>
+</section>
+
+<!-- ===================== TIMER ===================== -->
+<section id="timer">
+  <div class="phase" id="phaseLabel">READY</div>
+  <div class="round-count" id="roundCount">Round 1 / 12</div>
+  <div class="clock" id="clock">0:10</div>
+  <div class="next-up" id="nextUp"></div>
+  <div class="controls">
+    <button id="pauseBtn" class="primary">PAUSE</button>
+    <button id="stopBtn">STOP</button>
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Config / state ----------
+  var cfg = {
+    roundSec: 180,   // 3:00
+    restSec:  60,    // 1:00
+    rounds:   12,
+    prepSec:  10,
+    sound:    true
+  };
+
+  var LIMITS = {
+    roundSec:[5, 60*60, 15],
+    restSec: [0, 60*60, 15],
+    rounds:  [1, 99, 1],
+    prepSec: [0, 60, 5]
+  };
+
+  // Load saved settings
+  try {
+    var saved = JSON.parse(localStorage.getItem("boxingTimerCfg") || "{}");
+    for (var k in cfg) if (saved[k] !== undefined) cfg[k] = saved[k];
+  } catch(e){}
+
+  function save(){
+    try { localStorage.setItem("boxingTimerCfg", JSON.stringify(cfg)); } catch(e){}
+  }
+
+  // ---------- Helpers ----------
+  function fmt(sec){
+    sec = Math.max(0, Math.round(sec));
+    var m = Math.floor(sec/60);
+    var s = sec%60;
+    return m + ":" + (s<10?"0":"") + s;
+  }
+
+  function $(id){ return document.getElementById(id); }
+
+  // ---------- Setup screen rendering ----------
+  function renderSetup(){
+    $("roundSecDisp").textContent = fmt(cfg.roundSec);
+    $("restSecDisp").textContent  = fmt(cfg.restSec);
+    $("roundsDisp").textContent   = cfg.rounds;
+    $("prepSecDisp").textContent  = fmt(cfg.prepSec);
+    $("soundToggle").checked      = cfg.sound;
+    renderSummary();
+  }
+
+  function renderSummary(){
+    var workPerRound = cfg.roundSec;
+    var totalWork = workPerRound * cfg.rounds;
+    var totalRest = cfg.restSec * Math.max(0, cfg.rounds - 1);
+    var total = cfg.prepSec + totalWork + totalRest;
+    $("summary").innerHTML =
+      "<b>" + cfg.rounds + "</b> rounds × <b>" + fmt(cfg.roundSec) + "</b>" +
+      " &nbsp;·&nbsp; <b>" + fmt(cfg.restSec) + "</b> rest" +
+      "<br>Total workout: <b>" + fmt(total) + "</b>";
+  }
+
+  // Stepper buttons
+  document.querySelectorAll(".stepper button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var key  = btn.getAttribute("data-key");
+      var step = parseInt(btn.getAttribute("data-step"),10);
+      var dir  = btn.getAttribute("data-act") === "inc" ? 1 : -1;
+      var lim  = LIMITS[key];
+      cfg[key] = Math.min(lim[1], Math.max(lim[0], cfg[key] + dir*step));
+      save();
+      renderSetup();
+      blip();
+    });
+  });
+
+  $("soundToggle").addEventListener("change", function(){
+    cfg.sound = this.checked;
+    save();
+    if (cfg.sound){ ensureAudio(); blip(); }
+  });
+
+  // ---------- Web Audio (beeps, no files) ----------
+  var audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx){
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch(e){ audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function tone(freq, dur, when, vol){
+    if (!cfg.sound || !audioCtx) return;
+    var t = audioCtx.currentTime + (when||0);
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol||0.5, t+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t+dur+0.02);
+  }
+  function blip(){ ensureAudio(); tone(880,0.05,0,0.18); }
+  function countBeep(){ tone(700,0.12,0,0.5); }       // warning ticks
+  function roundStartBell(){ // start of a work round
+    tone(523,0.15,0,0.5); tone(784,0.5,0.15,0.5);
+  }
+  function bell(){ // end of round / bell sound
+    tone(660,0.5,0,0.55); tone(660,0.5,0.18,0.45); tone(990,0.7,0.36,0.5);
+  }
+  function finishFanfare(){
+    tone(523,0.2,0,0.5); tone(659,0.2,0.18,0.5);
+    tone(784,0.2,0.36,0.5); tone(1046,0.6,0.54,0.55);
+  }
+
+  function vibrate(ms){
+    if (navigator.vibrate){ try { navigator.vibrate(ms); } catch(e){} }
+  }
+
+  // ---------- Wake Lock (keep screen on) ----------
+  var wakeLock = null;
+  async function requestWake(){
+    try {
+      if ("wakeLock" in navigator){
+        wakeLock = await navigator.wakeLock.request("screen");
+      }
+    } catch(e){}
+  }
+  function releaseWake(){
+    try { if (wakeLock){ wakeLock.release(); wakeLock = null; } } catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible" && running && !paused) requestWake();
+  });
+
+  // ---------- Timer engine ----------
+  var PHASE = { PREP:"prep", ROUND:"round", REST:"rest", DONE:"done" };
+  var running = false, paused = false;
+  var phase = PHASE.PREP;
+  var currentRound = 1;
+  var remaining = 0;       // seconds left in phase
+  var phaseTotal = 0;
+  var endAt = 0;           // timestamp (ms) when phase ends
+  var ticker = null;
+  var lastWholeSec = -1;
+
+  var colors = {
+    prep:  "var(--prep)",
+    round: "var(--round)",
+    rest:  "var(--rest)",
+    done:  "var(--done)"
+  };
+
+  function setPhase(p, seconds){
+    phase = p;
+    phaseTotal = seconds;
+    remaining = seconds;
+    endAt = Date.now() + seconds*1000;
+    lastWholeSec = -1;
+    paintPhase();
+  }
+
+  function paintPhase(){
+    var t = $("timer");
+    t.style.background = colors[phase];
+    var label = $("phaseLabel"), rc = $("roundCount"), nu = $("nextUp");
+    if (phase === PHASE.PREP){
+      label.textContent = "GET READY";
+      rc.textContent = "Round 1 / " + cfg.rounds;
+      nu.textContent = "First round coming up";
+    } else if (phase === PHASE.ROUND){
+      label.textContent = "FIGHT";
+      rc.textContent = "Round " + currentRound + " / " + cfg.rounds;
+      nu.textContent = currentRound < cfg.rounds
+        ? "Next: " + fmt(cfg.restSec) + " rest"
+        : "Last round!";
+    } else if (phase === PHASE.REST){
+      label.textContent = "REST";
+      rc.textContent = "Round " + currentRound + " done";
+      nu.textContent = "Next: Round " + (currentRound+1) + " of " + cfg.rounds;
+    } else if (phase === PHASE.DONE){
+      label.textContent = "DONE 🎉";
+      rc.textContent = cfg.rounds + " rounds complete";
+      nu.textContent = "Great work!";
+    }
+    updateClock();
+  }
+
+  function updateClock(){
+    $("clock").textContent = fmt(remaining);
+  }
+
+  function startTicker(){
+    stopTicker();
+    ticker = setInterval(tick, 100);
+  }
+  function stopTicker(){ if (ticker){ clearInterval(ticker); ticker = null; } }
+
+  function tick(){
+    if (paused) return;
+    remaining = (endAt - Date.now())/1000;
+    var whole = Math.ceil(remaining);
+
+    if (whole !== lastWholeSec){
+      lastWholeSec = whole;
+      updateClock();
+      // Warning beeps in the last 3 seconds of a work round and last 3 of rest before next round
+      if ((phase === PHASE.ROUND || phase === PHASE.REST || phase === PHASE.PREP)
+          && whole >= 1 && whole <= 3){
+        countBeep();
+        vibrate(80);
+      }
+      // 10-second warning clapper during a round
+      if (phase === PHASE.ROUND && whole === 10){
+        tone(700,0.1,0,0.4);
+      }
+    }
+
+    if (remaining <= 0){
+      advance();
+    }
+  }
+
+  function advance(){
+    if (phase === PHASE.PREP){
+      beginRound(1);
+    } else if (phase === PHASE.ROUND){
+      bell(); vibrate([120,80,120]);
+      if (currentRound >= cfg.rounds){
+        finish();
+      } else if (cfg.restSec > 0){
+        setPhase(PHASE.REST, cfg.restSec);
+      } else {
+        beginRound(currentRound + 1);
+      }
+    } else if (phase === PHASE.REST){
+      beginRound(currentRound + 1);
+    }
+  }
+
+  function beginRound(n){
+    currentRound = n;
+    setPhase(PHASE.ROUND, cfg.roundSec);
+    roundStartBell();
+    vibrate([200,100,200]);
+  }
+
+  function finish(){
+    setPhase(PHASE.DONE, 0);
+    finishFanfare();
+    vibrate([300,120,300,120,300]);
+    stopTicker();
+    running = false;
+    paused = false;
+    releaseWake();
+    $("pauseBtn").textContent = "DONE";
+    $("pauseBtn").disabled = true;
+    $("clock").textContent = "✓";
+  }
+
+  // ---------- Controls ----------
+  function startWorkout(){
+    ensureAudio();
+    requestWake();
+    running = true;
+    paused = false;
+    currentRound = 1;
+    $("pauseBtn").disabled = false;
+    $("pauseBtn").textContent = "PAUSE";
+    $("setup").style.display = "none";
+    $("timer").classList.add("active");
+
+    if (cfg.prepSec > 0){
+      setPhase(PHASE.PREP, cfg.prepSec);
+    } else {
+      beginRound(1);
+    }
+    startTicker();
+  }
+
+  function togglePause(){
+    if (!running) return;
+    paused = !paused;
+    if (paused){
+      $("pauseBtn").textContent = "RESUME";
+      releaseWake();
+    } else {
+      // recompute endAt from remaining
+      endAt = Date.now() + remaining*1000;
+      $("pauseBtn").textContent = "PAUSE";
+      ensureAudio();
+      requestWake();
+    }
+  }
+
+  function stopWorkout(){
+    stopTicker();
+    running = false; paused = false;
+    releaseWake();
+    $("timer").classList.remove("active");
+    $("pauseBtn").disabled = false;
+    $("pauseBtn").textContent = "PAUSE";
+    $("setup").style.display = "flex";
+  }
+
+  $("startBtn").addEventListener("click", startWorkout);
+  $("pauseBtn").addEventListener("click", togglePause);
+  $("stopBtn").addEventListener("click", function(){
+    if (running && confirm("Stop the workout?")) stopWorkout();
+    else if (!running) stopWorkout();
+  });
+
+  // Tap the clock to pause/resume too
+  $("clock").addEventListener("click", togglePause);
+
+  // Prevent accidental scroll/zoom bounce
+  document.addEventListener("touchmove", function(e){
+    if ($("timer").classList.contains("active")) e.preventDefault();
+  }, {passive:false});
+
+  // ---------- Init ----------
+  renderSetup();
+})();
+</script>
+</body>
+</html>
