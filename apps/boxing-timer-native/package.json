@@ -1,0 +1,25 @@
+{
+  "name": "interval-timer-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor native wrapper (iOS + Android) for the Interval Timer web app.",
+  "type": "module",
+  "scripts": {
+    "copy": "node copy-web.mjs",
+    "sync": "npm run copy && cap sync",
+    "ios": "npm run copy && cap sync ios && cap open ios",
+    "android": "npm run copy && cap sync android && cap open android",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#0d0d12' --splashBackgroundColor '#0d0d12'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.0",
+    "@capacitor/cli": "^7.0.0"
+  }
+}

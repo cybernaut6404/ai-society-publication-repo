@@ -1,0 +1,22 @@
+{
+  "appId": "ai.rickai.intervaltimer",
+  "appName": "Interval Timer",
+  "webDir": "www",
+  "backgroundColor": "#0d0d12",
+  "ios": {
+    "backgroundColor": "#0d0d12",
+    "contentInset": "always"
+  },
+  "android": {
+    "backgroundColor": "#0d0d12"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 700,
+      "launchAutoHide": true,
+      "backgroundColor": "#0d0d12",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    }
+  }
+}

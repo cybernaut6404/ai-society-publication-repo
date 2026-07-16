@@ -1,0 +1,14 @@
+# Generated / installed — not committed
+node_modules/
+www/
+
+# Native platform projects are generated on your Mac with `npx cap add`.
+# They're large and machine-specific; regenerate rather than commit.
+ios/
+android/
+
+# Generated app icons/splash (from `npm run assets`)
+resources/**/generated/
+
+*.log
+.DS_Store

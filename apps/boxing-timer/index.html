@@ -782,5 +782,16 @@
 })();
 </script>
 <script src="sync.js"></script>
+<script>
+  /* Native (Capacitor) polish — no-op in a plain browser. Guarded so the web
+     app is unaffected when Capacitor isn't present. */
+  (function(){
+    var C=window.Capacitor;
+    if(!C||!C.Plugins) return;
+    var SB=C.Plugins.StatusBar, SS=C.Plugins.SplashScreen;
+    try{ if(SB){ SB.setStyle({style:"DARK"}); if(C.getPlatform&&C.getPlatform()==="android") SB.setBackgroundColor({color:"#0d0d12"}); } }catch(e){}
+    try{ if(SS) SS.hide(); }catch(e){}
+  })();
+</script>
 </body>
 </html>
