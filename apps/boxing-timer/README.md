@@ -1,42 +1,56 @@
-# 🥊 Boxing Timer
+# ⏱️ Interval Timer
 
-A single-file boxing / interval round timer that runs entirely in your phone's
-browser. No install, no account, no network needed — open the page and go.
+A single-file, multi-sport interval / round / lap timer that runs entirely in
+your phone's browser. No install, no account, no network needed.
 
-## What it does
+> Started life as a boxing round timer; now a general training timer. The
+> folder name stays `boxing-timer` so existing links keep working.
 
-- **Round length** — how long each round is (e.g. 3:00)
-- **Number of rounds** — e.g. 12
-- **Rest between rounds** — e.g. 1:00
-- **Prep countdown** — a "get ready" delay before round 1
-- **Sound + warning beeps** — 10-second warning during a round, a bell at the
-  end of each round, and a fanfare when the whole workout is done
-- **Vibration** on phones that support it
-- **Keeps the screen awake** while the timer runs (Wake Lock)
-- **Remembers your settings** between sessions (localStorage)
+## Features
+
+**Timer modes**
+- **Rounds** — work / rest × rounds (boxing, MMA, etc.)
+- **Intervals** — build a custom sequence of named steps, repeated for N sets
+  (Tabata, HIIT, running, circuits)
+- **Stopwatch** — count up with lap splits
+
+**Sport presets** — Boxing, MMA, Tabata, HIIT, Running, Circuit (one tap to
+load sensible defaults, then tweak).
+
+**Cues**
+- Voice announcements (speaks each interval name aloud)
+- Selectable bell sounds (Classic, Boxing Bell, Triple Beep, Air Horn, Chime,
+  Buzzer) + last-3-seconds countdown beeps
+- Vibration on transitions
+- Audio layers over Spotify / Apple Music without pausing it
+
+**Customisable look & feel** — 6 themes (Midnight, Carbon, Slate, Ocean, Light,
+Sand) + 8 accent colours.
+
+**Training log** — every completed session is saved locally; the History
+screen shows weekly totals and a day streak. (Designed to later sync to a
+backend for cross-device reports.)
+
+**Quality-of-life** — keeps the screen awake while running (Wake Lock),
+remembers all settings between sessions.
 
 ## Use it on your phone
 
-Pick whichever is easiest:
-
-1. **Host it (recommended).** Put this folder on any static host
-   (GitHub Pages, Netlify, Vercel, or `python3 -m http.server` on your laptop)
-   and open the URL on your phone. Then **Add to Home Screen** so it opens
-   full-screen like a native app.
-2. **Open the file directly.** Email/AirDrop/save `index.html` to your phone
-   and open it in your browser.
-
-### Quick local serve
+Open the hosted URL in Safari/Chrome, then **Share → Add to Home Screen** for a
+full-screen, app-like experience. Or host the folder yourself:
 
 ```bash
 cd apps/boxing-timer
 python3 -m http.server 8080
-# then open http://<your-computer-ip>:8080 on your phone (same Wi-Fi)
+# open http://<your-computer-ip>:8080 on your phone (same Wi-Fi)
 ```
 
-## Notes
+Everything lives in `index.html` — no build step, no dependencies.
 
-- Tap the big clock to pause/resume.
-- Sound needs one tap to start (browsers block audio until you interact) —
-  pressing **START** handles that automatically.
-- Everything is in `index.html` — no build step, no dependencies.
+## Roadmap
+
+- **Phase 1 (here):** the app itself — modes, presets, cues, themes, local log
+- **Phase 2:** backend — accounts + cloud sync + web dashboard/reports
+- **Phase 3:** native wrappers (Capacitor) for the App Store & Google Play
+- **Backlog:** EMOM / AMRAP / For-Time formats, save named custom workouts,
+  Apple Watch, background audio
