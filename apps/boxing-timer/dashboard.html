@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Interval Timer — Reports</title>
+<style>
+  :root{
+    --bg:#0d0d12; --panel:#16161f; --panel-2:#1f1f2b; --text:#f4f4f8; --muted:#8a8a9a;
+    --series:#3b82f6; --grid:#242433; --axis:#33333f; --good:#22c55e;
+    --border:rgba(255,255,255,0.08);
+  }
+  @media (prefers-color-scheme: light){
+    :root:where(:not([data-theme="dark"])){
+      --bg:#f9f9f7; --panel:#ffffff; --panel-2:#f0f0ee; --text:#0b0b0b; --muted:#6b6a66;
+      --series:#2a78d6; --grid:#e6e6e2; --axis:#c9c8c2; --good:#0a8f0a;
+      --border:rgba(11,11,11,0.10);
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
+  body{
+    background:var(--bg);color:var(--text);min-height:100dvh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:calc(18px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));
+    max-width:760px;margin:0 auto;
+  }
+  a{color:var(--series);}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;}
+  h1{font-size:23px;font-weight:800;letter-spacing:.3px;margin:0;display:flex;align-items:center;gap:9px;}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 20px;}
+  .btn{background:var(--panel-2);color:var(--text);border:none;border-radius:11px;padding:9px 13px;
+       font-size:14px;font-weight:600;cursor:pointer;}
+  .btn:active{transform:scale(.96);}
+  .btn.ghost{background:none;color:var(--muted);}
+
+  /* KPI stat tiles */
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:22px;}
+  @media(min-width:560px){.kpis{grid-template-columns:repeat(4,1fr);}}
+  .kpi{background:var(--panel);border-radius:16px;padding:16px 15px;}
+  .kpi .v{font-size:28px;font-weight:800;line-height:1.05;}
+  .kpi .v small{font-size:15px;font-weight:700;color:var(--muted);}
+  .kpi .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;}
+
+  .panel{background:var(--panel);border-radius:18px;padding:18px 16px 14px;margin-bottom:18px;}
+  .panel h2{font-size:15px;font-weight:700;margin:0 0 2px;}
+  .panel .cap{color:var(--muted);font-size:12px;margin:0 0 14px;}
+  .charthead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .linkbtn{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
+
+  svg{display:block;width:100%;height:auto;overflow:visible;}
+  .bar{transition:opacity .12s;} .bar:hover{opacity:.82;cursor:default;}
+  .tick{fill:var(--muted);font-size:11px;}
+  .val{fill:var(--text);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .gridline{stroke:var(--grid);stroke-width:1;} .axisline{stroke:var(--axis);stroke-width:1;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+  .hidden{display:none;}
+
+  .empty{background:var(--panel);border-radius:18px;padding:30px 22px;text-align:center;}
+  .empty .big{font-size:34px;margin-bottom:10px;}
+  .empty p{color:var(--muted);font-size:14px;line-height:1.5;margin:8px 0;}
+  #tip{position:fixed;pointer-events:none;background:var(--panel-2);color:var(--text);
+       border:1px solid var(--border);border-radius:9px;padding:7px 10px;font-size:12px;
+       font-weight:600;opacity:0;transition:opacity .1s;transform:translate(-50%,-115%);z-index:9;white-space:nowrap;}
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 Reports</h1>
+  <div style="display:flex;gap:8px">
+    <button class="btn ghost" id="refresh">↻ Refresh</button>
+    <a class="btn" href="index.html">← Timer</a>
+  </div>
+</header>
+<div class="sub" id="who">Loading…</div>
+
+<div id="content"></div>
+<div id="tip" role="status"></div>
+
+<script type="module">
+const CFG_KEY="itBackend", SUPA_ESM="https://esm.sh/@supabase/supabase-js@2";
+const $=id=>document.getElementById(id);
+const content=$("content"), tip=$("tip");
+
+function cfg(){try{return JSON.parse(localStorage.getItem(CFG_KEY)||"null");}catch(e){return null;}}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
+function fmtDur(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);
+  return h?(h+"h "+m+"m"):(m+"m");}
+function weekLabel(d){return new Date(d).toLocaleDateString(undefined,{month:"short",day:"numeric"});}
+
+function emptyState(msg,detail){
+  $("who").textContent="";
+  content.innerHTML=`<div class="empty"><div class="big">📈</div>
+    <p><b>${esc(msg)}</b></p><p>${detail}</p></div>`;
+}
+
+async function main(){
+  const c=cfg();
+  if(!c||!c.url||!c.anonKey){
+    return emptyState("No cloud backend connected",
+      `Open the <a href="index.html">timer</a> → Settings → <b>Cloud sync</b> and connect a Supabase project first. Reports read the workouts you've synced there.`);
+  }
+  let sb;
+  try{
+    const mod=await import(SUPA_ESM);
+    sb=mod.createClient(c.url,c.anonKey,{auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}});
+  }catch(e){ return emptyState("Couldn't load the backend library", esc(e.message||e)); }
+
+  const {data:sess}=await sb.auth.getSession();
+  const user=sess&&sess.session?sess.session.user:null;
+  if(!user){
+    return emptyState("Not signed in",
+      `Open the <a href="index.html">timer</a> → Settings → <b>Cloud sync</b> and sign in with your email link, then come back here.`);
+  }
+  $("who").textContent="Signed in as "+(user.email||"your account");
+
+  // Three reads: weekly summary + per-sport totals (report views) + raw days (for streak).
+  const [wk, sp, days] = await Promise.all([
+    sb.from("v_weekly_summary").select("*").order("week",{ascending:true}),
+    sb.from("v_sport_totals").select("*").order("total_sec",{ascending:false}),
+    sb.from("sessions").select("started_at")
+  ]);
+  const err = wk.error||sp.error||days.error;
+  if(err) return emptyState("Couldn't load your data", esc(err.message||err));
+
+  const weeks=wk.data||[], sports=sp.data||[], allDays=(days.data||[]).map(r=>r.started_at);
+  if(!weeks.length && !sports.length){
+    return emptyState("No sessions yet",
+      `Finish a workout in the <a href="index.html">timer</a> and hit <b>Sync now</b> — your reports show up here.`);
+  }
+
+  render(weeks, sports, allDays);
+}
+
+function render(weeks, sports, allDays){
+  const totalSessions=sports.reduce((a,s)=>a+ (+s.sessions||0),0);
+  const totalSec=sports.reduce((a,s)=>a+ (+s.total_sec||0),0);
+  const sportCount=sports.filter(s=>s.sport).length || new Set(sports.map(s=>s.sport)).size;
+  const streak=currentStreak(allDays);
+
+  content.innerHTML =
+    kpiRow([
+      [totalSessions, "Sessions"],
+      [fmtDur(totalSec), "Total time"],
+      [streak+`<small> day${streak===1?"":"s"}</small>`, "Current streak"],
+      [sportCount, "Sports"]
+    ]) +
+    `<section class="panel">
+       <div class="charthead"><div><h2>Weekly volume</h2><p class="cap">Minutes trained per week</p></div>
+         <button class="linkbtn" data-t="wk">Table</button></div>
+       <div id="wkChart"></div><div id="wkTable" class="hidden"></div>
+     </section>
+     <section class="panel">
+       <div class="charthead"><div><h2>By sport</h2><p class="cap">Total minutes per sport</p></div>
+         <button class="linkbtn" data-t="sp">Table</button></div>
+       <div id="spChart"></div><div id="spTable" class="hidden"></div>
+     </section>`;
+
+  drawWeekly(fillWeeks(weeks));
+  drawSports(sports);
+
+  content.querySelectorAll(".linkbtn").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.t, chart=$(k+"Chart"), tbl=$(k+"Table");
+    const show=tbl.classList.toggle("hidden")===false;
+    chart.classList.toggle("hidden",show); b.textContent=show?"Chart":"Table";
+  }));
+}
+
+function kpiRow(items){
+  return `<div class="kpis">`+items.map(([v,k])=>
+    `<div class="kpi"><div class="v">${v}</div><div class="k">${esc(k)}</div></div>`).join("")+`</div>`;
+}
+
+/* ---- current streak: consecutive calendar days (ending today or yesterday) with ≥1 session ---- */
+function currentStreak(iso){
+  if(!iso.length) return 0;
+  const set=new Set(iso.map(t=>{const d=new Date(t);return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();}));
+  const key=d=>d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
+  let d=new Date(), n=0;
+  if(!set.has(key(d))) d.setDate(d.getDate()-1);   // allow streak that's current through yesterday
+  while(set.has(key(d))){n++;d.setDate(d.getDate()-1);}
+  return n;
+}
+
+/* ---- fill missing weeks (0) between first and last, cap to last 12 ---- */
+function fillWeeks(weeks){
+  if(!weeks.length) return [];
+  const byWeek={}; weeks.forEach(w=>byWeek[new Date(w.week).getTime()]=w);
+  const out=[]; let cur=new Date(weeks[0].week), end=new Date(weeks[weeks.length-1].week);
+  while(cur<=end){
+    const t=cur.getTime(), w=byWeek[t];
+    out.push({week:cur.toISOString(), min:w?Math.round((+w.total_sec)/60):0, sessions:w?+w.sessions:0});
+    cur=new Date(cur); cur.setDate(cur.getDate()+7);
+  }
+  return out.slice(-12);
+}
+
+/* ---- vertical bars: weekly volume ---- */
+function drawWeekly(rows){
+  const host=$("wkChart");
+  if(!rows.length){host.innerHTML=`<p class="cap">No weekly data yet.</p>`;return;}
+  const W=Math.max(320, host.clientWidth||640), H=210, padL=8, padR=8, padB=34, padT=18;
+  const max=Math.max(...rows.map(r=>r.min),1);
+  const iw=W-padL-padR, n=rows.length, gap=8, bw=Math.min(46,(iw-gap*(n-1))/n);
+  const step=(iw-bw)/(Math.max(n-1,1)), plotH=H-padB-padT;
+  const y=v=>padT+plotH-(v/max)*plotH;
+  let g="";
+  // gridlines (recessive)
+  [0,.5,1].forEach(f=>{const yy=padT+plotH-f*plotH;
+    g+=`<line class="gridline" x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}"/>`;});
+  g+=`<line class="axisline" x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}"/>`;
+  rows.forEach((r,i)=>{
+    const x=padL+(n===1?(iw-bw)/2:i*step), h=Math.max(r.min>0?3:0,(r.min/max)*plotH), yy=padT+plotH-h;
+    if(h>0) g+=`<rect class="bar" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--series)"
+        data-lab="${esc(weekLabel(r.week))}" data-val="${r.min} min · ${r.sessions} session${r.sessions===1?"":"s"}"></rect>`;
+    if(r.min>0) g+=`<text class="val" x="${(x+bw/2).toFixed(1)}" y="${(yy-6).toFixed(1)}" text-anchor="middle">${r.min}</text>`;
+    if(i%Math.ceil(n/6)===0||i===n-1)
+      g+=`<text class="tick" x="${(x+bw/2).toFixed(1)}" y="${H-padB+18}" text-anchor="middle">${esc(weekLabel(r.week))}</text>`;
+  });
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly training minutes">${g}</svg>`;
+  wireTips(host);
+  $("wkTable").innerHTML=tableHTML(["Week","Minutes","Sessions"],
+    rows.map(r=>[weekLabel(r.week),r.min,r.sessions]),[false,true,true]);
+}
+
+/* ---- horizontal bars: per-sport ---- */
+function drawSports(sports){
+  const host=$("spChart");
+  const rows=sports.map(s=>({name:s.sport||"—",min:Math.round((+s.total_sec)/60),sessions:+s.sessions}))
+                   .filter(r=>r.min>=0).slice(0,10);
+  if(!rows.length){host.innerHTML=`<p class="cap">No sport data yet.</p>`;return;}
+  const max=Math.max(...rows.map(r=>r.min),1);
+  const W=Math.max(320, host.clientWidth||640), rowH=34, labW=Math.min(120,W*0.32), padR=52;
+  const H=rows.length*rowH+6, barMax=W-labW-padR;
+  let g="";
+  rows.forEach((r,i)=>{
+    const yy=i*rowH+6, bh=20, bw=Math.max(r.min>0?3:0,(r.min/max)*barMax);
+    g+=`<text class="tick" x="${labW-10}" y="${yy+bh/2+4}" text-anchor="end" style="fill:var(--text);font-weight:600">${esc(trunc(r.name,12))}</text>`;
+    g+=`<rect class="bar" x="${labW}" y="${yy}" width="${bw.toFixed(1)}" height="${bh}" rx="4" fill="var(--series)"
+        data-lab="${esc(r.name)}" data-val="${r.min} min · ${r.sessions} session${r.sessions===1?"":"s"}"></rect>`;
+    g+=`<text class="val" x="${(labW+bw+8).toFixed(1)}" y="${yy+bh/2+4}">${r.min}</text>`;
+  });
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Minutes per sport">${g}</svg>`;
+  wireTips(host);
+  $("spTable").innerHTML=tableHTML(["Sport","Minutes","Sessions"],
+    rows.map(r=>[r.name,r.min,r.sessions]),[false,true,true]);
+}
+
+function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+"…":s;}
+function tableHTML(head,rows,num){
+  return `<table><thead><tr>${head.map((h,i)=>`<th class="${num[i]?"n":""}">${esc(h)}</th>`).join("")}</tr></thead>`
+    +`<tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${num[i]?"n":""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+function wireTips(host){
+  host.querySelectorAll(".bar").forEach(b=>{
+    const move=e=>{const p=(e.touches&&e.touches[0])||e;
+      tip.innerHTML=`<b>${esc(b.dataset.lab)}</b> — ${esc(b.dataset.val)}`;
+      tip.style.left=p.clientX+"px"; tip.style.top=p.clientY+"px"; tip.style.opacity="1";};
+    b.addEventListener("mouseenter",move); b.addEventListener("mousemove",move);
+    b.addEventListener("touchstart",move,{passive:true});
+    b.addEventListener("mouseleave",()=>tip.style.opacity="0");
+    b.addEventListener("touchend",()=>setTimeout(()=>tip.style.opacity="0",1200));
+  });
+}
+
+$("refresh").addEventListener("click",()=>{content.innerHTML="";$("who").textContent="Refreshing…";main();});
+main().catch(e=>emptyState("Something went wrong", esc(e&&e.message||e)));
+</script>
+</body>
+</html>

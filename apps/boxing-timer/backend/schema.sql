@@ -84,7 +84,12 @@ create policy "own sessions" on public.sessions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ── Report views (the dashboard reads these) ────────────────────────────────
-create or replace view public.v_weekly_summary as
+-- security_invoker = true makes the view run with the *querying* user's
+-- privileges, so the base table's RLS applies to them. WITHOUT it a view runs
+-- as its owner (who bypasses RLS) and every signed-in user would read everyone
+-- else's aggregates. It is the required setting here. (Postgres 15+ / Supabase.)
+create or replace view public.v_weekly_summary
+  with (security_invoker = true) as
 select user_id,
        date_trunc('week', started_at) as week,
        count(*)              as sessions,
@@ -93,11 +98,10 @@ select user_id,
 from public.sessions
 group by 1, 2;
 
-create or replace view public.v_sport_totals as
+create or replace view public.v_sport_totals
+  with (security_invoker = true) as
 select user_id, sport,
        count(*)          as sessions,
        sum(duration_sec) as total_sec
 from public.sessions
 group by 1, 2;
-
--- Views inherit the base tables' RLS, so users only ever see their own totals.

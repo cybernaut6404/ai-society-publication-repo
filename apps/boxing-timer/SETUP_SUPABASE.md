@@ -44,12 +44,19 @@ Go to **Project Settings → API** and copy:
 4. Your existing history/workouts upload automatically. On any other device,
    connect the same project + sign in with the same email to see everything.
 
+## 6. View your reports
+Once connected, a **📊 View reports & charts** button appears in the Cloud sync
+section. It opens `dashboard.html` — weekly training volume, a per-sport
+breakdown, total time, and your current day streak, read from your synced data.
+(Each chart has a **Table** toggle if you'd rather read the numbers.)
+
 ## Troubleshooting
 - **"Sign in first" / no email**: check the redirect URL in step 3 matches your
   app URL exactly (including the trailing slash).
 - **Sync error mentioning a table**: re-run `schema.sql` (step 2).
 - **Nothing appears on the other device**: hit **Sync now** in Settings on both.
 
-## What's next (Phase 2c)
-A web dashboard (`apps/dashboard/`) that reads the `v_weekly_summary` and
-`v_sport_totals` views for charts — weekly volume, streaks, per-sport totals.
+## What's next
+The reports dashboard (`dashboard.html`) reads the `v_weekly_summary` and
+`v_sport_totals` views. Future ideas: date-range filters, personal records, and
+per-mode breakdowns (EMOM/AMRAP/For-Time).

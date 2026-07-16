@@ -334,6 +334,7 @@
   <div class="field">
     <div id="syncBox"></div>
     <div class="hint2" style="margin-top:10px">Back up your workouts &amp; history and sync across devices. Needs a free Supabase project — see <b>SETUP_SUPABASE.md</b> in the repo. The timer works fully without this.</div>
+    <a href="dashboard.html" id="reportsLink" style="display:none;margin-top:12px;text-align:center;text-decoration:none" class="primary-btn">📊 View reports &amp; charts</a>
   </div>
 </section>
 
@@ -762,6 +763,7 @@
     $("setVoice").checked=prefs.voice;$("setSound").checked=prefs.sound;$("setVibrate").checked=prefs.vibrate;
     $("bellName").textContent=(BELLS[prefs.bell]||BELLS[0]).name;
     if(window.ITSync)ITSync.mount($("syncBox"));
+    if($("reportsLink"))$("reportsLink").style.display=(window.ITSync&&ITSync.configured())?"block":"none";
   }
   $("setVoice").addEventListener("change",function(){prefs.voice=this.checked;savePrefs();if(this.checked){voiceOn=true;speak("Voice on");}});
   $("setSound").addEventListener("change",function(){prefs.sound=this.checked;savePrefs();});
