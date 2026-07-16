@@ -41,8 +41,17 @@ full-screen, app-like experience. Or host the folder yourself:
 
 ```bash
 cd apps/boxing-timer
-python3 -m http.server 8080
-# open http://<your-computer-ip>:8080 on your phone (same Wi-Fi)
+python3 -m http.server 9130
+# open http://<your-computer-ip>:9130 on your phone (same Wi-Fi)
+```
+
+Port `9130` sits in this repo's `9100–9199` allocation (the backend API owns
+`9100`). Before binding it on a fleet Mac, check and claim it against the port
+registry (Postgres `fleet.port_registry` on the studioshare VPS):
+
+```bash
+ports check 9130   # exit 0 = free, 2 = taken; pick another with: ports next 9100-9199
+ports claim 9130 --workspace ai-society-publication-repo --service "boxing-timer static server"
 ```
 
 Everything lives in `index.html` — no build step, no dependencies.
