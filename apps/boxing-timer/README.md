@@ -60,7 +60,8 @@ Everything lives in `index.html` — no build step, no dependencies.
 
 - **Phase 1:** the app itself — modes, presets, cues, themes, local log ✅
 - **Phase 2:** backend — accounts + cloud sync + reports dashboard ✅
-  (optional Supabase; see `SETUP_SUPABASE.md`. Charts live in `dashboard.html`.)
+  (optional Supabase; see `SETUP_SUPABASE.md`. Charts live in the standalone
+  `apps/dashboard/` app.)
 - **Phase 3:** native wrappers (Capacitor) for the App Store & Google Play
 - **Backlog:** EMOM / AMRAP / For-Time formats, save named custom workouts,
   Apple Watch, background audio

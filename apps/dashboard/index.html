@@ -65,6 +65,8 @@
   .empty{background:var(--panel);border-radius:18px;padding:30px 22px;text-align:center;}
   .empty .big{font-size:34px;margin-bottom:10px;}
   .empty p{color:var(--muted);font-size:14px;line-height:1.5;margin:8px 0;}
+  .fld{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);
+       background:var(--panel-2);color:var(--text);font-size:15px;margin:6px 0;}
   #tip{position:fixed;pointer-events:none;background:var(--panel-2);color:var(--text);
        border:1px solid var(--border);border-radius:9px;padding:7px 10px;font-size:12px;
        font-weight:600;opacity:0;transition:opacity .1s;transform:translate(-50%,-115%);z-index:9;white-space:nowrap;}
@@ -75,7 +77,7 @@
   <h1>📊 Reports</h1>
   <div style="display:flex;gap:8px">
     <button class="btn ghost" id="refresh">↻ Refresh</button>
-    <a class="btn" href="index.html">← Timer</a>
+    <a class="btn" href="../boxing-timer/">Timer ↗</a>
   </div>
 </header>
 <div class="sub" id="who">Loading…</div>
@@ -89,6 +91,7 @@ const $=id=>document.getElementById(id);
 const content=$("content"), tip=$("tip");
 
 function cfg(){try{return JSON.parse(localStorage.getItem(CFG_KEY)||"null");}catch(e){return null;}}
+function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
 function fmtDur(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);
   return h?(h+"h "+m+"m"):(m+"m");}
@@ -100,26 +103,86 @@ function emptyState(msg,detail){
     <p><b>${esc(msg)}</b></p><p>${detail}</p></div>`;
 }
 
-async function main(){
+/* ---------------------------------------------------------------------------
+   Standalone auth shell. This app stands on its own: connect a Supabase
+   backend and sign in here, no timer required. It shares the `itBackend`
+   localStorage key, so on the same origin (e.g. GitHub Pages) a project you
+   already connected in the timer is picked up automatically, and vice-versa.
+--------------------------------------------------------------------------- */
+let sb=null, statusMsg="";
+
+async function ensureClient(){
+  if(sb) return sb;
+  const c=cfg(); if(!c||!c.url||!c.anonKey) return null;
+  const mod=await import(SUPA_ESM);
+  sb=mod.createClient(c.url,c.anonKey,{auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}});
+  return sb;
+}
+
+async function boot(){
   const c=cfg();
-  if(!c||!c.url||!c.anonKey){
-    return emptyState("No cloud backend connected",
-      `Open the <a href="index.html">timer</a> → Settings → <b>Cloud sync</b> and connect a Supabase project first. Reports read the workouts you've synced there.`);
-  }
-  let sb;
+  if(!c||!c.url||!c.anonKey) return renderConnect();
+  try{ await ensureClient(); }
+  catch(e){ return renderConnect("Couldn't load the backend library: "+(e.message||e)); }
+  let user=null;
   try{
-    const mod=await import(SUPA_ESM);
-    sb=mod.createClient(c.url,c.anonKey,{auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}});
-  }catch(e){ return emptyState("Couldn't load the backend library", esc(e.message||e)); }
+    const {data}=await sb.auth.getSession();
+    user=data&&data.session?data.session.user:null;
+    sb.auth.onAuthStateChange((_e,s)=>{ const u=s?s.user:null; if(!!u!==!!user){ user=u; boot(); } });
+  }catch(e){ return renderSignIn("Backend error: "+(e.message||e)); }
+  if(!user) return renderSignIn();
+  return loadReports(user);
+}
 
-  const {data:sess}=await sb.auth.getSession();
-  const user=sess&&sess.session?sess.session.user:null;
-  if(!user){
-    return emptyState("Not signed in",
-      `Open the <a href="index.html">timer</a> → Settings → <b>Cloud sync</b> and sign in with your email link, then come back here.`);
-  }
-  $("who").textContent="Signed in as "+(user.email||"your account");
+function authbar(user){
+  $("who").innerHTML=`Signed in as <b>${esc(user.email||"your account")}</b> · `
+    +`<button class="linkbtn" id="__out">Sign out</button>`;
+  const b=$("__out"); if(b) b.addEventListener("click",signOut);
+}
 
+function renderConnect(msg){
+  $("who").textContent="Standalone reports — connect a Supabase project to begin.";
+  content.innerHTML=`<div class="empty" style="text-align:left">
+    <div class="big" style="text-align:center">🔌</div>
+    <p style="text-align:center"><b>Connect a cloud backend</b></p>
+    <p>Paste your Supabase <b>Project URL</b> and <b>anon/public key</b>
+       (Project Settings → API). See <b>SETUP_SUPABASE.md</b> in the repo to create a free project.</p>
+    <input id="__url" type="url" placeholder="https://xxxx.supabase.co" class="fld">
+    <input id="__key" type="text" placeholder="anon public key" class="fld">
+    <button class="btn" id="__save" style="width:100%;padding:12px;margin-top:4px">Connect</button>
+    <p id="__cerr" style="color:var(--muted);text-align:center">${esc(msg||"")}</p></div>`;
+  $("__save").addEventListener("click",()=>{
+    const url=$("__url").value.trim(), key=$("__key").value.trim();
+    if(!url||!key){ $("__cerr").textContent="Both fields are required."; return; }
+    setCfg({url,anonKey:key}); sb=null; boot();
+  });
+}
+
+function renderSignIn(msg){
+  $("who").textContent="Backend connected — sign in to see your reports.";
+  content.innerHTML=`<div class="empty" style="text-align:left">
+    <div class="big" style="text-align:center">✉️</div>
+    <p style="text-align:center"><b>Sign in</b></p>
+    <p>We'll email you a one-tap sign-in link. Use the same email you use in the timer.</p>
+    <input id="__email" type="email" inputmode="email" placeholder="you@email.com" class="fld">
+    <button class="btn" id="__send" style="width:100%;padding:12px;margin-top:4px">Email me a sign-in link</button>
+    <p id="__serr" style="color:var(--muted);text-align:center">${esc(msg||statusMsg||"")}</p>
+    <p style="text-align:center"><button class="linkbtn" id="__reconf">Use a different backend</button></p></div>`;
+  $("__send").addEventListener("click",async()=>{
+    const email=$("__email").value.trim(); if(!email){ $("__serr").textContent="Enter your email first."; return; }
+    try{
+      await ensureClient(); $("__serr").textContent="Sending…";
+      const r=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split("#")[0]}});
+      $("__serr").textContent=r.error?("Error: "+r.error.message):"Check your email for the link, then reopen this page.";
+    }catch(e){ $("__serr").textContent="Error: "+(e.message||e); }
+  });
+  $("__reconf").addEventListener("click",()=>{ renderConnect(); });
+}
+
+async function signOut(){ try{ if(sb) await sb.auth.signOut(); }catch(e){} sb=cfg()?sb:null; boot(); }
+
+async function loadReports(user){
+  authbar(user);
   // Three reads: weekly summary + per-sport totals (report views) + raw days (for streak).
   const [wk, sp, days] = await Promise.all([
     sb.from("v_weekly_summary").select("*").order("week",{ascending:true}),
@@ -132,7 +195,7 @@ async function main(){
   const weeks=wk.data||[], sports=sp.data||[], allDays=(days.data||[]).map(r=>r.started_at);
   if(!weeks.length && !sports.length){
     return emptyState("No sessions yet",
-      `Finish a workout in the <a href="index.html">timer</a> and hit <b>Sync now</b> — your reports show up here.`);
+      `Finish a workout in the <a href="../boxing-timer/">timer</a> and hit <b>Sync now</b> — your reports show up here.`);
   }
 
   render(weeks, sports, allDays);
@@ -270,8 +333,8 @@ function wireTips(host){
   });
 }
 
-$("refresh").addEventListener("click",()=>{content.innerHTML="";$("who").textContent="Refreshing…";main();});
-main().catch(e=>emptyState("Something went wrong", esc(e&&e.message||e)));
+$("refresh").addEventListener("click",()=>{content.innerHTML="";$("who").textContent="Refreshing…";boot();});
+boot().catch(e=>emptyState("Something went wrong", esc(e&&e.message||e)));
 </script>
 </body>
 </html>
