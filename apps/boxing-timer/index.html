@@ -329,6 +329,12 @@
     <div class="display"><span id="bellName">Classic</span><small>tap to preview</small></div>
     <button id="bellNext">›</button>
   </div></div>
+
+  <div class="section-title">Cloud sync (optional)</div>
+  <div class="field">
+    <div id="syncBox"></div>
+    <div class="hint2" style="margin-top:10px">Back up your workouts &amp; history and sync across devices. Needs a free Supabase project — see <b>SETUP_SUPABASE.md</b> in the repo. The timer works fully without this.</div>
+  </div>
 </section>
 
 <button class="homebtn" id="homeFab" style="display:none">☰</button>
@@ -704,6 +710,7 @@
     else entry.detail={laps:laps.length,splits:laps.map(function(l){return Math.round(l.split);})};
     var arr=loadLog();arr.unshift(entry);try{localStorage.setItem("itSessions",JSON.stringify(arr.slice(0,500)));}catch(e){}
     sessionMeta=null;
+    if(window.ITSync)ITSync.syncSoon();
   }
   function loadLog(){try{return JSON.parse(localStorage.getItem("itSessions")||"[]");}catch(e){return[];}}
 
@@ -754,6 +761,7 @@
     });
     $("setVoice").checked=prefs.voice;$("setSound").checked=prefs.sound;$("setVibrate").checked=prefs.vibrate;
     $("bellName").textContent=(BELLS[prefs.bell]||BELLS[0]).name;
+    if(window.ITSync)ITSync.mount($("syncBox"));
   }
   $("setVoice").addEventListener("change",function(){prefs.voice=this.checked;savePrefs();if(this.checked){voiceOn=true;speak("Voice on");}});
   $("setSound").addEventListener("change",function(){prefs.sound=this.checked;savePrefs();});
@@ -766,8 +774,12 @@
   applyTheme();
   renderSaved();
 
+  // Bridge for the optional cloud-sync module (sync.js) to refresh views after a pull
+  window.__itOnPulled=function(){renderSaved(); if($("history").classList.contains("active"))renderHistory();};
+
   document.addEventListener("touchmove",function(e){if($("timer").classList.contains("active"))e.preventDefault();},{passive:false});
 })();
 </script>
+<script src="sync.js"></script>
 </body>
 </html>
