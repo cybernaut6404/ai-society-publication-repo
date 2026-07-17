@@ -5,7 +5,17 @@
   "use strict";
   var CFG_KEY="itBackend", SYNC_KEY="itSyncAt";
   var SUPA_ESM="https://esm.sh/@supabase/supabase-js@2";
-  var sb=null, user=null, container=null, status="";
+  // Custom URL scheme the native (Capacitor) app registers for magic-link
+  // sign-in. Must match Info.plist / AndroidManifest + the Supabase redirect
+  // list. Keep in sync with apps/boxing-timer-native/.
+  var REDIRECT_NATIVE="intervaltimer://login-callback";
+  var sb=null, user=null, container=null, status="", deepLinksReady=false;
+
+  // True only inside the packaged Capacitor app, never in a plain browser.
+  function isNative(){try{return !!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());}catch(e){return false;}}
+  // Where the magic-link should return to: the app's custom scheme on native,
+  // the current web URL otherwise.
+  function redirectTarget(){return isNative()?REDIRECT_NATIVE:location.href.split("#")[0];}
 
   function cfg(){try{return JSON.parse(localStorage.getItem(CFG_KEY)||"null");}catch(e){return null;}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -15,11 +25,43 @@
     if(sb) return sb;
     var c=cfg(); if(!c) return null;
     var mod=await import(SUPA_ESM);
-    sb=mod.createClient(c.url,c.anonKey,{auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}});
+    // Native uses PKCE: the magic link returns a `code` we exchange manually
+    // after the deep link opens the app. Web keeps the implicit flow, where
+    // detectSessionInUrl parses the token fragment automatically.
+    sb=mod.createClient(c.url,c.anonKey,{auth:{
+      persistSession:true, detectSessionInUrl:!isNative(), autoRefreshToken:true,
+      flowType:isNative()?"pkce":"implicit"
+    }});
     return sb;
   }
 
+  // Native deep-link handler: when the magic link reopens the app as
+  // intervaltimer://login-callback?code=…, exchange the code for a session.
+  // No-op on web (there the token arrives in the URL fragment and Supabase's
+  // detectSessionInUrl handles it). Registered once, guarded for native only.
+  function setupDeepLinks(){
+    if(deepLinksReady||!isNative()) return;
+    var App=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+    if(!App||!App.addListener) return;
+    deepLinksReady=true;
+    App.addListener("appUrlOpen",function(ev){ handleDeepLink(ev&&ev.url); });
+  }
+  async function handleDeepLink(url){
+    if(!url||url.indexOf("login-callback")<0) return;
+    try{
+      var code=null;
+      try{ code=new URL(url).searchParams.get("code"); }catch(e){}
+      if(!code) return;
+      await ensureClient();
+      status="Signing in…"; render();
+      var r=await sb.auth.exchangeCodeForSession(code);
+      if(r.error){ status="Sign-in error: "+r.error.message; render(); return; }
+      // onAuthStateChange (wired in init) picks up the new session and syncs.
+    }catch(e){ status="Sign-in error: "+(e&&e.message||e); render(); }
+  }
+
   async function init(){
+    setupDeepLinks();
     if(!configured()){ render(); return; }
     try{
       await ensureClient();
@@ -65,8 +107,7 @@
     if(!email){status="Enter your email first.";render();return;}
     try{
       await ensureClient(); status="Sending link…"; render();
-      var redirect=location.href.split("#")[0];
-      var r=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:redirect}});
+      var r=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:redirectTarget()}});
       status=r.error?("Error: "+r.error.message):"Check your email for the sign-in link, then reopen this page.";
       render();
     }catch(e){status="Error: "+(e&&e.message||e);render();}
