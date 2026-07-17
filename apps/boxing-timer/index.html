@@ -334,6 +334,7 @@
   <div class="field">
     <div id="syncBox"></div>
     <div class="hint2" style="margin-top:10px">Back up your workouts &amp; history and sync across devices. Needs a free Supabase project — see <b>SETUP_SUPABASE.md</b> in the repo. The timer works fully without this.</div>
+    <a href="../dashboard/" id="reportsLink" style="margin-top:12px;text-align:center;text-decoration:none" class="primary-btn">📊 Open reports dashboard</a>
   </div>
 </section>
 
@@ -781,5 +782,16 @@
 })();
 </script>
 <script src="sync.js"></script>
+<script>
+  /* Native (Capacitor) polish — no-op in a plain browser. Guarded so the web
+     app is unaffected when Capacitor isn't present. */
+  (function(){
+    var C=window.Capacitor;
+    if(!C||!C.Plugins) return;
+    var SB=C.Plugins.StatusBar, SS=C.Plugins.SplashScreen;
+    try{ if(SB){ SB.setStyle({style:"DARK"}); if(C.getPlatform&&C.getPlatform()==="android") SB.setBackgroundColor({color:"#0d0d12"}); } }catch(e){}
+    try{ if(SS) SS.hide(); }catch(e){}
+  })();
+</script>
 </body>
 </html>

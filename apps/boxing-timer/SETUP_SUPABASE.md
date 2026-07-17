@@ -22,8 +22,10 @@ without it — this only *adds* backup and sync. One-time setup, ~10 minutes,
    app's address:
    ```
    https://cybernaut6404.github.io/ai-society-publication-repo/apps/boxing-timer/
+   https://cybernaut6404.github.io/ai-society-publication-repo/apps/dashboard/
    ```
-   (Add `http://localhost` too if you test locally.)
+   (The second is the standalone reports app, which has its own sign-in. Add
+   `http://localhost` too if you test locally.)
 
 ## 4. Copy your two keys
 Go to **Project Settings → API** and copy:
@@ -44,12 +46,23 @@ Go to **Project Settings → API** and copy:
 4. Your existing history/workouts upload automatically. On any other device,
    connect the same project + sign in with the same email to see everything.
 
+## 6. View your reports
+The reports live in a **separate standalone app** at `apps/dashboard/`
+(open it directly, or tap **📊 Open reports dashboard** in the timer's Cloud
+sync section). It's self-contained: connect the same Supabase project and sign
+in there once — weekly training volume, a per-sport breakdown, total time, and
+your current day streak, read from your synced data. (Each chart has a **Table**
+toggle if you'd rather read the numbers.) On the same host (e.g. GitHub Pages)
+it reuses the backend you already connected in the timer, so it usually needs no
+extra setup beyond the sign-in link.
+
 ## Troubleshooting
 - **"Sign in first" / no email**: check the redirect URL in step 3 matches your
   app URL exactly (including the trailing slash).
 - **Sync error mentioning a table**: re-run `schema.sql` (step 2).
 - **Nothing appears on the other device**: hit **Sync now** in Settings on both.
 
-## What's next (Phase 2c)
-A web dashboard (`apps/dashboard/`) that reads the `v_weekly_summary` and
-`v_sport_totals` views for charts — weekly volume, streaks, per-sport totals.
+## What's next
+The reports dashboard (`apps/dashboard/`) reads the `v_weekly_summary` and
+`v_sport_totals` views. Future ideas: date-range filters, personal records, and
+per-mode breakdowns (EMOM/AMRAP/For-Time).
