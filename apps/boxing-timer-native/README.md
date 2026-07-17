@@ -63,13 +63,50 @@ npm run sync
   Capacitor-guarded script at the end of `../boxing-timer/index.html` (a no-op
   in a normal browser).
 
-## Cloud sync note
+## Cloud sync — deep-link sign-in
 
-The optional Supabase magic-link sign-in redirects back to the app. For the
-packaged app you'll want a custom URL scheme / deep link (e.g.
-`intervaltimer://`) added to the Supabase redirect list and the native config —
-not required to build and run locally, but needed before shipping sign-in to
-the stores. Tracked as a follow-up.
+The optional Supabase sign-in emails a magic link. In the packaged app that
+link must reopen the app, so it uses a custom URL scheme
+**`intervaltimer://login-callback`** (PKCE flow: the app exchanges the returned
+`code` for a session). The web app keeps using its normal page URL.
+
+The web side is already wired (`../boxing-timer/sync.js` +
+`@capacitor/app`'s `appUrlOpen` listener). Three things to register once, on
+your Mac / in the Supabase dashboard:
+
+**1. Supabase → Authentication → URL Configuration → Redirect URLs** — add:
+```
+intervaltimer://login-callback
+```
+
+**2. iOS — `ios/App/App/Info.plist`** — add inside the top-level `<dict>`:
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key>
+    <string>ai.rickai.intervaltimer</string>
+    <key>CFBundleURLSchemes</key>
+    <array><string>intervaltimer</string></array>
+  </dict>
+</array>
+```
+
+**3. Android — `android/app/src/main/AndroidManifest.xml`** — add inside the
+main `<activity>` (alongside the existing launcher intent-filter):
+```xml
+<intent-filter android:autoVerify="false">
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="intervaltimer" android:host="login-callback" />
+</intent-filter>
+```
+
+Then `npm run sync` and rebuild. To test on device/simulator: connect a backend
+in Settings → Cloud sync, request a sign-in link, open the email **on the
+device**, tap it — it should reopen the app signed in. (If the scheme is
+missing, the OS won't hand the link back to the app.)
 
 ## What's committed vs generated
 

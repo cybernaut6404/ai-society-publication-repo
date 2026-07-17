@@ -23,9 +23,12 @@ without it — this only *adds* backup and sync. One-time setup, ~10 minutes,
    ```
    https://cybernaut6404.github.io/ai-society-publication-repo/apps/boxing-timer/
    https://cybernaut6404.github.io/ai-society-publication-repo/apps/dashboard/
+   intervaltimer://login-callback
    ```
-   (The second is the standalone reports app, which has its own sign-in. Add
-   `http://localhost` too if you test locally.)
+   (The second is the standalone reports app, which has its own sign-in. The
+   third is the native app's deep-link scheme — see
+   `apps/boxing-timer-native/README.md`. Add `http://localhost` too if you test
+   locally.)
 
 ## 4. Copy your two keys
 Go to **Project Settings → API** and copy:
